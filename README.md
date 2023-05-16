@@ -1,0 +1,2 @@
+# GenieTutorialsChineseTranslation
+Genie学习指南中文版
