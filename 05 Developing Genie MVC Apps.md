@@ -49,14 +49,14 @@ end
 ```yml
 dev:
   adapter: PostgreSQL
-  database: test
+  database: dev
   host: localhost
   username: genie
-  password: XLobQxcDAfqqbor2GCyH
+  password: 
   port: 5432
 ```
 
-数据库这些都要先建好, 保证数据库连接正常.
+数据库这些都要先建好, 保证数据库连接正常. 若密码留空, 则在启动时会提示输入密码.
 
 **然后**到REPL加载数据库配置:
 
@@ -70,10 +70,15 @@ dev:
 
 ```julia
 julia> Genie.Generator.newresource("movie")
+#...\WatchTonight\app\resources\movies\MoviesController.jl
 julia> SearchLight.Generator.newresource("movie")
+#...\WatchTonight\app\resources\movies\Movies.jl
+#...\WatchTonight\db\migrations\2023052201100800_create_table_movies.jl
+#...\WatchTonight\app\resources\movies\MoviesValidator.jl
+#...\WatchTonight\test\movies_test.jl
 ```
 
-这两个命令会在`app/`, `db/`, `test/`下创建多个文件来表示这个影视资源.
+这两个命令会在`app/`, `db/`, `test/`下创建多个文件来表示这个影视资源. 注意上面日志中生成的文件名.
 
 ### 创建数据库迁移表
 
@@ -94,7 +99,7 @@ function up()
       column(:actors, :string, limit=250)
       column(:country, :string, limit=100)
       # 原文档column(:year, :integer, limit = 4)在执行迁移时会报错, 整数没有limit
-      column(:year, :integer, limit=4)
+      column(:year, :integer)
       column(:rating, :string, limit=10)
       column(:categories, :string, limit=100)
       column(:description, :string, limit=1_000)
@@ -119,7 +124,7 @@ end
 
 注意在执行时会自动增加一个`SERIAL`类型的`id`列并作为表格的主键
 
-### 创建迁移表
+#### 创建迁移表
 
 为了管理App的潜移, 需要通过SearchLight的迁移系统创建数据库表格, 在REPL上操作:
 
@@ -202,7 +207,7 @@ Movie
 
 结果是创建了一个Movie实例.
 
-执行第一行命令可能会报错``ERROR: UndefVarError: `Movies` not defined``, 这可能是编辑`Movies.jl`没有autoload导致, 通过`julia> include(joinpath("app", "resources", "movies", "Movies.jl"))`应该可以解决, 实在不行退出Julia重新进入项目肯定正常.
+执行第一行命令可能会报错``ERROR: UndefVarError: `Movies` not defined``, 这可能是编辑`Movies.jl`没有autoload导致, 通过`julia> include(joinpath("app", "resources", "movies", "Movies.jl"))`可以解决.
 
 新创建的这个Movie实例还没有保存到数据库, 这可在REPL上通过`julia> SearchLight.ispersisted(m)`进行查询. 要**保存**这个记录, 可以通过命令`julia > SearchLight.save(m)`实现:
 
@@ -347,7 +352,7 @@ help?> Genie.Renderer.Html.html
 
 可见, `partial`函数是将把所引内容渲染到一个更大的视图或布局文件中, `html`则是将输入数据解析成HTML作为HTTP的响应内容, html的第一个参数实际上是一个HTML模板.
 
-**进一步**创建视图文件`_movie.jl.html`:
+**进一步**创建视图片段文件`_movie.jl.html`:
 
 ```html
 <div class="container" style="margin-top: 40px;">
@@ -368,7 +373,7 @@ help?> Genie.Renderer.Html.html
 </div>
 ```
 
-**以及**视图文件`_no_results.jl.html`:
+**以及**视图片段文件`_no_results.jl.html`:
 
 ```html
 <h4 class="container">
@@ -436,7 +441,7 @@ end
 route("/movies/search", MoviesController.search, named = :search_movies)
 ```
 
-最后, 到`./WatchTonight/app/resources/movies/MovieControllers.jl`中添加句柄函数`search()`
+最后, 到`./WatchTonight/app/resources/movies/MoviesControllers.jl`中添加句柄函数`search()`
 
 ```julia
 module MoviesController
@@ -459,7 +464,7 @@ end
 end
 ```
 
-刷新http://127.0.0.1:8000/movies看效果!
+刷新http://127.0.0.1:8000/movies看效果, 此时可以搜索!
 
 `search()`函数涉及几个库函数, 有必要查看:
 
@@ -497,7 +502,7 @@ end
 
 访问http://127.0.0.1:8000/movies/search_api?search_movies=xxxx看效果, xxxx是模糊匹配串, 会返回一个json对象.
 
-## 额外收获Bonus
+## Genie插件
 
 对于站点的限制区域, 添加一个数据库后端的授权验证, 使用`GenieAuthentication`插件.
 
@@ -507,7 +512,7 @@ julia> using GenieAuthentication
 julia> GenieAuthentication.install(@__DIR__)  # 安装插件文件, 会创建多个文件或目录
 julia> SearchLight.Migration.up("CreateTableUsers")  # 执行数据迁移, 创建users表格
 
-julia> include(joinpath("app", "helpers", "GenieAuthenticationViewHelper.jl"))  # 源文档缺少这行, 导致下一步报错
+julia> include(joinpath("app", "helpers", "GenieAuthenticationViewHelper.jl"))  # 源文档缺少这行, 导致下一步报, 或者重启app解决
 julia> Genie.Generator.newcontroller("Admin", pluralize=false)  # 在app/resources/admin下生成新文件
 julia> include(joinpath("plugins", "genie_authentication.jl"))  # 报错, 没有定义句柄函数
 
@@ -534,11 +539,23 @@ module AdminController
 using GenieAuthentication, Genie.Renderer, Genie.Exceptions, Genie.Renderer.Html
 
 function index()
-  @authenticated!
+  @authenticated!()     # 这行是关键
   h1("Welcome Admin") |> html
 end
 
 end
 ```
 
- 访问http://127.0.0.1:8000/admin/movies没有达到预期效果!!!
+ 访问http://127.0.0.1:8000/admin/movies, 会重定向到http://127.0.0.1:8000/login
+
+开放用户注册, 编辑`plugins/genie_authentication.jl`文件, 将后面两行取消注释:
+
+```julia
+# UNCOMMENT TO ENABLE REGISTRATION ROUTES
+
+route("/register", AuthenticationController.show_register, named = :show_register)
+route("/register", AuthenticationController.register, method = POST, named = :register)
+```
+
+
+
