@@ -14,6 +14,24 @@ julia> Genie.Generator.newapp_mvc("Watch Tonight", autostart=false)  # Genie会�
 
 **踩坑**: 创建MVC工程会问选用哪个数据库, 选项3是PostgreSQL, 在windows下编译LibPQ会遇到LLVM问题"Unable to open libLLVM!", 解决方法是, 安装过GitHub的LibPQ.jl: `pkg> add https://github.com/iamed2/LibPQ.jl.git`. 如果仍然报错, 那是因为SearchLight的原因, 单独安装SearchLight应该可以解决`pkg> add SearchLight`. 如果还有提示, 安装[LLVM](https://github.com/llvm/llvm-project/releases), 并且勾选添加路径. 最后, 添加一个路径, 其中包含libpq.dll, 如果本地没有安装PostgreSQL数据库, 可以安装pgAdmin, 其中包含libpq.dll.
 
+```
+注: 
+
+Unable to open libLLVM!
+
+最新的LLVM安装包里面也没有libLLVM.dll文件, 目前最终解决办法是:
+
+julia> @show Base.libllvm_path()
+
+根据提示找到Julia安装包里的libllvm文件, 把对应的dll文件复制一份并改名为libLLVM.dll, 然后编译LibPQ.
+
+pkg> build LibPQ
+
+编译成功后, 执行using LibPQ应该不会提示错误.
+```
+
+
+
 注意不要自动开始, 通过设置参数`autostart=false`, 否则会使用默认参数去连接数据库而导致失败. 
 
 工程创建完后会提示:
